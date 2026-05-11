@@ -1,0 +1,28 @@
+.tabs-panel {
+  border-radius: 24px;
+  padding: 18px 20px;
+}
+
+.tab-row {
+  justify-content: space-between;
+}
+
+.tab-list {
+  gap: 10px;
+}
+
+.tab {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.6rem 0.95rem;
+  background: var(--panel-soft);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.tab.active {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+  color: var(--ink);
+}

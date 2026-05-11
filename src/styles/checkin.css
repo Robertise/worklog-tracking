@@ -1,0 +1,7 @@
+.checkin-panel {
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-soft);
+  margin-bottom: 18px;
+}

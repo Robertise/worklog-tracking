@@ -1,0 +1,101 @@
+@media (max-width: 960px) {
+  .app-shell {
+    padding: 24px 16px 48px;
+  }
+
+  .app-header {
+    padding: 24px;
+    flex-direction: column;
+  }
+
+  .summary-card {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .toolbar-side {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .date-control,
+  .date-control input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .theme-switcher {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .theme-option {
+    flex: 1 1 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .toolbar-panel,
+  .profile-panel,
+  .tabs-panel,
+  .day-panel {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .header-actions,
+  .toolbar-side,
+  .tab-row,
+  .tab-actions,
+  .table-actions {
+    align-items: stretch;
+  }
+
+  .header-actions > *,
+  .tab-actions > *,
+  .table-actions > * {
+    width: 100%;
+  }
+
+  .button,
+  .toggle {
+    justify-content: center;
+  }
+
+  .day-meta {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .entry-field,
+  .entry-field-compact,
+  .entry-field-wide,
+  .entry-field-half {
+    grid-column: span 6;
+  }
+
+  .entry-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .entry-card-footer .button {
+    width: 100%;
+  }
+
+  .panel-tabs {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 560px) {
+  .entry-field,
+  .entry-field-compact,
+  .entry-field-wide,
+  .entry-field-half,
+  .entry-field-full {
+    grid-column: 1 / -1;
+  }
+}

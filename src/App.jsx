@@ -1,158 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import * as XLSX from 'xlsx'
-import './App.css'
-import { Moon, Sun } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style'
 
-const STATUS_OPTIONS = ['Not started', 'In progress', 'Done']
-const FILE_VERSION = 1
-const STORAGE_KEY = 'worklog-ledger:v1'
-const THEME_STORAGE_KEY = 'worklog-ledger:theme'
-const TIME_STEP_MINUTES = 10
-const TIME_START_HOUR = 9
-const TIME_END_HOUR = 17
-const TIME_OPTIONS = Array.from(
-  { length: (TIME_END_HOUR - TIME_START_HOUR) * (60 / TIME_STEP_MINUTES) + 1 },
-  (_, index) => {
-    const totalMinutes = TIME_START_HOUR * 60 + index * TIME_STEP_MINUTES
-    const hours = Math.floor(totalMinutes / 60)
-    const minutes = totalMinutes % 60
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
-  },
-)
+import {
+  FILE_VERSION,
+  STORAGE_KEY,
+  PROFILE_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from './constants'
+import { todayStamp } from './utils/id'
+import { calculateDurationHours } from './utils/time'
+import { normalizeDay, normalizeProfile } from './utils/normalize'
+import { createEntry, createTodo, createDay } from './utils/factories'
+import { loadFromStorage, loadProfileFromStorage, getPreferredTheme } from './utils/storage'
+import { buildSheet, sanitizeSheetName } from './utils/excel'
 
-
-
-const createId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-  return `entry-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-const todayStamp = () => new Date().toISOString().slice(0, 10)
-
-const createEntry = () => ({
-  id: createId(),
-  startTime: '',
-  endTime: '',
-  project: '',
-  task: '',
-  status: STATUS_OPTIONS[0],
-  notes: '',
-})
-
-const calculateDurationHours = (startTime, endTime) => {
-  if (!startTime || !endTime) return null
-  const [startHour, startMinute] = startTime.split(':').map(Number)
-  const [endHour, endMinute] = endTime.split(':').map(Number)
-  if ([startHour, startMinute, endHour, endMinute].some(Number.isNaN)) {
-    return null
-  }
-  const startTotal = startHour * 60 + startMinute
-  const endTotal = endHour * 60 + endMinute
-  if (endTotal <= startTotal) return null
-  return (endTotal - startTotal) / 60
-}
-
-const sanitizeSheetName = (name) => {
-  const cleaned = name.replace(/[\\/*?:\[\]]/g, '').trim()
-  return cleaned.slice(0, 31) || 'Worklog'
-}
-
-const buildSheet = (entries) => {
-  const header = [
-    'Start Time',
-    'End Time',
-    'Project',
-    'Task Description',
-    'Duration (hrs)',
-    'Status',
-    'Notes',
-  ]
-
-  const rows = entries.map((entry) => {
-    const duration = calculateDurationHours(entry.startTime, entry.endTime)
-    return [
-      entry.startTime,
-      entry.endTime,
-      entry.project,
-      entry.task,
-      duration === null ? '' : Number(duration.toFixed(2)),
-      entry.status,
-      entry.notes,
-    ]
-  })
-
-  return XLSX.utils.aoa_to_sheet([header, ...rows])
-}
-
-const normalizeEntry = (entry) => ({
-  id: entry?.id || createId(),
-  startTime: entry?.startTime || '',
-  endTime: entry?.endTime || '',
-  project: entry?.project || '',
-  task: entry?.task || '',
-  status: STATUS_OPTIONS.includes(entry?.status)
-    ? entry.status
-    : STATUS_OPTIONS[0],
-  notes: entry?.notes || '',
-})
-
-const normalizeDay = (day, fallbackId) => {
-  const id = day?.id || day?.label || fallbackId
-  return {
-    id,
-    label: day?.label || id,
-    entries: Array.isArray(day?.entries)
-      ? day.entries.map(normalizeEntry)
-      : [],
-  }
-}
-
-const loadFromStorage = () => {
-  if (typeof window === 'undefined' || !window.localStorage) return null
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed?.days) || parsed.days.length === 0) {
-      return null
-    }
-    const normalizedDays = parsed.days.map((day, index) =>
-      normalizeDay(day, `Stored-${index + 1}`),
-    )
-    const activeId = normalizedDays.some(
-      (day) => day.id === parsed.activeDayId,
-    )
-      ? parsed.activeDayId
-      : normalizedDays[0].id
-    const pendingDate = /^\d{4}-\d{2}-\d{2}$/.test(parsed.pendingDate)
-      ? parsed.pendingDate
-      : activeId
-    return { days: normalizedDays, activeDayId: activeId, pendingDate }
-  } catch (error) {
-    return null
-  }
-}
-
-const getPreferredTheme = () => {
-  if (typeof window === 'undefined') return 'light'
-  const savedTheme = window.localStorage?.getItem(THEME_STORAGE_KEY)
-  if (savedTheme === 'light' || savedTheme === 'dark') {
-    return savedTheme
-  }
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light'
-}
+import Header from './components/Header'
+import Toolbar from './components/Toolbar'
+import ProfilePanel from './components/ProfilePanel'
+import DayTabs from './components/DayTabs'
+import DayPanel from './components/DayPanel'
+import Notice from './components/Notice'
 
 function App() {
   const initialDate = todayStamp()
   const initialData = useMemo(() => loadFromStorage(), [])
   const [days, setDays] = useState(() =>
-    initialData?.days || [
-      { id: initialDate, label: initialDate, entries: [createEntry()] },
-    ],
+    initialData?.days || [createDay(initialDate, true)],
   )
   const [activeDayId, setActiveDayId] = useState(
     () => initialData?.activeDayId || initialDate,
@@ -160,8 +33,10 @@ function App() {
   const [pendingDate, setPendingDate] = useState(
     () => initialData?.pendingDate || initialDate,
   )
+  const [profile, setProfile] = useState(() => loadProfileFromStorage())
   const [theme, setTheme] = useState(getPreferredTheme)
   const [readOnly, setReadOnly] = useState(false)
+  const [activePanel, setActivePanel] = useState('worklog')
   const [notice, setNotice] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -178,6 +53,7 @@ function App() {
     }, 0)
   }, [activeDay])
 
+  // Persist worklog data
   useEffect(() => {
     if (typeof window === 'undefined' || !window.localStorage) return
     const payload = {
@@ -190,6 +66,16 @@ function App() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
   }, [days, activeDayId, pendingDate])
 
+  // Persist profile
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.localStorage) return
+    window.localStorage.setItem(
+      PROFILE_STORAGE_KEY,
+      JSON.stringify(profile),
+    )
+  }, [profile])
+
+  // Apply theme
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.theme = theme
@@ -198,6 +84,8 @@ function App() {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme)
     }
   }, [theme])
+
+  /* ── Entry actions ─────────────────────── */
 
   const updateEntry = (entryId, field, value) => {
     setDays((prevDays) =>
@@ -212,8 +100,6 @@ function App() {
       }),
     )
   }
-
-
 
   const addEntry = () => {
     setDays((prevDays) =>
@@ -238,6 +124,59 @@ function App() {
     )
   }
 
+  /* ── Todo actions ──────────────────────── */
+
+  const updateTodo = (todoId, field, value) => {
+    setDays((prevDays) =>
+      prevDays.map((day) => {
+        if (day.id !== activeDay.id) return day
+        return {
+          ...day,
+          todos: day.todos.map((todo) =>
+            todo.id === todoId ? { ...todo, [field]: value } : todo,
+          ),
+        }
+      }),
+    )
+  }
+
+  const addTodo = () => {
+    setDays((prevDays) =>
+      prevDays.map((day) =>
+        day.id === activeDay.id
+          ? { ...day, todos: [...day.todos, createTodo()] }
+          : day,
+      ),
+    )
+  }
+
+  const deleteTodo = (todoId) => {
+    setDays((prevDays) =>
+      prevDays.map((day) =>
+        day.id === activeDay.id
+          ? {
+              ...day,
+              todos: day.todos.filter((todo) => todo.id !== todoId),
+            }
+          : day,
+      ),
+    )
+  }
+
+  /* ── Day / profile actions ─────────────── */
+
+  const updateDayField = (field, value) => {
+    setDays((prevDays) =>
+      prevDays.map((day) =>
+        day.id === activeDay.id ? { ...day, [field]: value } : day,
+      ),
+    )
+  }
+
+  const updateProfileField = (field, value) => {
+    setProfile((prev) => ({ ...prev, [field]: value }))
+  }
+
   const addDay = () => {
     if (!pendingDate || readOnly) return
     setDays((prevDays) => {
@@ -245,7 +184,7 @@ function App() {
       if (exists) return prevDays
       const nextDays = [
         ...prevDays,
-        { id: pendingDate, label: pendingDate, entries: [] },
+        createDay(pendingDate, false),
       ].sort((a, b) => a.id.localeCompare(b.id))
       return nextDays
     })
@@ -279,11 +218,14 @@ function App() {
     deleteDay(dayId)
   }
 
+  /* ── File IO ───────────────────────────── */
+
   const triggerSave = () => {
     const payload = {
       version: FILE_VERSION,
       exportedAt: new Date().toISOString(),
       activeDayId,
+      profile,
       days,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -323,6 +265,10 @@ function App() {
           ? parsed.activeDayId
           : normalizedDays[0].id
 
+        setProfile((prevProfile) =>
+          parsed?.profile ? normalizeProfile(parsed.profile) : prevProfile,
+        )
+
         setDays(normalizedDays)
         setActiveDayId(nextActive)
         const nextPending = /^\d{4}-\d{2}-\d{2}$/.test(nextActive)
@@ -348,7 +294,7 @@ function App() {
       scope === 'active' ? [activeDay].filter(Boolean) : days
 
     targetDays.forEach((day) => {
-      const sheet = buildSheet(day.entries)
+      const sheet = buildSheet(day, profile)
       XLSX.utils.book_append_sheet(workbook, sheet, sanitizeSheetName(day.id))
     })
 
@@ -356,9 +302,11 @@ function App() {
       scope === 'active'
         ? `worklog-${activeDay?.id || todayStamp()}.xlsx`
         : `worklog-all-${todayStamp()}.xlsx`
-    XLSX.writeFile(workbook, filename)
+    XLSX.writeFile(workbook, filename, { bookType: 'xlsx', cellStyles: true })
     setNotice({ type: 'success', text: 'XLSX export ready.' })
   }
+
+  /* ── Render ────────────────────────────── */
 
   return (
     <div className="app-shell">
@@ -366,321 +314,58 @@ function App() {
       <div className="app-glow app-glow-two" aria-hidden="true" />
 
       <div className="app">
-        <header className="app-header">
-          <div className="hero-copy">
-            <p className="eyebrow">Worklog Studio</p>
-            <h1>Daily Worklog Ledger</h1>
-            <p className="subtle">
-              Track your day in timed blocks. Auto-saves to this browser and
-              exports Excel-ready sheets when needed.
-            </p>
-          </div>
+        <Header
+          totalHours={totalHours}
+          entryCount={activeDay?.entries.length || 0}
+        />
 
-          <aside className="summary-card" aria-label="Total hours summary">
-            <span>Total Hours</span>
-            <strong>{totalHours.toFixed(2)}</strong>
-            <small>{activeDay?.entries.length || 0} entries today</small>
-          </aside>
-        </header>
+        <Toolbar
+          onSave={triggerSave}
+          onImport={triggerImport}
+          onExportDay={() => exportWorkbook('active')}
+          onExportAll={() => exportWorkbook('all')}
+          readOnly={readOnly}
+          onReadOnlyChange={setReadOnly}
+          fileInputRef={fileInputRef}
+          onFileChange={handleImport}
+          pendingDate={pendingDate}
+          onPendingDateChange={setPendingDate}
+          theme={theme}
+          onThemeChange={setTheme}
+        />
 
-        <section className="toolbar-panel">
-          <div className="header-actions">
-            <button className="button primary" type="button" onClick={triggerSave}>
-              Save file
-            </button>
-            <button
-              className="button primary"
-              type="button"
-              onClick={triggerImport}
-            >
-              Import file
-            </button>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => exportWorkbook('active')}
-            >
-              Export day
-            </button>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => exportWorkbook('all')}
-            >
-              Export all
-            </button>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={readOnly}
-                onChange={(event) => setReadOnly(event.target.checked)}
-              />
-              <span>View-only</span>
-            </label>
-            <input
-              ref={fileInputRef}
-              className="file-input"
-              type="file"
-              accept="application/json"
-              onChange={handleImport}
-            />
-          </div>
+        <Notice notice={notice} />
 
-          <div className="toolbar-side">
-            <label className="date-control">
-              <span className="field-label">Worklog date</span>
-              <input
-                type="date"
-                value={pendingDate}
-                onChange={(event) => setPendingDate(event.target.value)}
-                disabled={readOnly}
-              />
-            </label>
+        <ProfilePanel
+          profile={profile}
+          onUpdateField={updateProfileField}
+          readOnly={readOnly}
+        />
 
-            <div className="theme-switcher" role="group" aria-label="Theme">
-              <button
-                className={`theme-option ${theme === 'light' ? 'active' : ''}`}
-                type="button"
-                onClick={() => setTheme('light')}
-              >
-                <Sun size={16} /> 
-              </button>
-              <button
-                className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
-                type="button"
-                onClick={() => setTheme('dark')}
-              >
-                <Moon size={16} />
-              </button>
-            </div>
-          </div>
-        </section>
+        <DayTabs
+          days={days}
+          activeDayId={activeDayId}
+          onSelectDay={setActiveDayId}
+          onAddDay={addDay}
+          readOnly={readOnly}
+          pendingDate={pendingDate}
+        />
 
-        {notice && (
-          <div className={`notice ${notice.type}`} role="status">
-            {notice.text}
-          </div>
-        )}
-
-        <section className="tabs-panel">
-          <div className="tab-row">
-            <div className="tab-list" role="tablist" aria-label="Worklog days">
-              {days.map((day) => (
-                <button
-                  key={day.id}
-                  className={`tab ${day.id === activeDayId ? 'active' : ''}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={day.id === activeDayId}
-                  onClick={() => setActiveDayId(day.id)}
-                >
-                  {day.label}
-                </button>
-              ))}
-            </div>
-            <div className="tab-actions">
-              <button
-                className="button outline"
-                type="button"
-                onClick={addDay}
-                disabled={readOnly || !pendingDate}
-              >
-                Add day
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="day-panel">
-          <div className="day-meta">
-            <div>
-              <h2>{activeDay?.label || 'No day selected'}</h2>
-              <p className="subtle">{activeDay?.entries.length || 0} entries</p>
-            </div>
-            <div className="day-actions">
-              <button
-                className="button danger"
-                type="button"
-                onClick={() => confirmDeleteDay(activeDay?.id)}
-                disabled={readOnly || days.length <= 1}
-              >
-                Delete day
-              </button>
-            </div>
-          </div>
-
-          <div className="entry-list" role="region" aria-live="polite">
-            {activeDay?.entries.length ? (
-              activeDay.entries.map((entry, index) => {
-                const duration = calculateDurationHours(
-                  entry.startTime,
-                  entry.endTime,
-                )
-                const durationLabel =
-                  duration === null ? '--' : duration.toFixed(2)
-                const invalidRange =
-                  entry.startTime &&
-                  entry.endTime &&
-                  duration === null
-                return (
-                  <article
-                    key={entry.id}
-                    className={`entry-card ${invalidRange ? 'invalid' : ''}`}
-                    style={{ '--i': index }}
-                  >
-                    <div className="entry-grid">
-                      <label className="entry-field entry-field-compact">
-                        <span className="field-caption">Start time</span>
-                        <div className="time-picker">
-                          <select
-                            value={entry.startTime}
-                            onChange={(event) =>
-                              updateEntry(entry.id, 'startTime', event.target.value)
-                            }
-                            disabled={readOnly}
-                            aria-label="Start time"
-                          >
-                            <option value="">--:--</option>
-                            {TIME_OPTIONS.map((time) => (
-                              <option key={time} value={time}>
-                                {time}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </label>
-
-                      <label className="entry-field entry-field-compact">
-                        <span className="field-caption">End time</span>
-                        <div className="time-picker">
-                          <select
-                            value={entry.endTime}
-                            onChange={(event) =>
-                              updateEntry(entry.id, 'endTime', event.target.value)
-                            }
-                            disabled={readOnly}
-                            aria-label="End time"
-                          >
-                            <option value="">--:--</option>
-                            {TIME_OPTIONS.map((time) => (
-                              <option key={time} value={time}>
-                                {time}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </label>
-
-                      <div className="entry-field duration-card">
-                        <span className="field-caption">Duration</span>
-                        <div className="duration">
-                          <strong>{durationLabel}</strong>
-                          <span>hours</span>
-                          {invalidRange && (
-                            <small>End time must be after start time.</small>
-                          )}
-                        </div>
-                      </div>
-
-                      <label className="entry-field">
-                        <span className="field-caption">Status</span>
-                        <div className="status-group" role="group">
-                          {STATUS_OPTIONS.map((option) => (
-                            <label key={option} className="status-option">
-                              <input
-                                type="checkbox"
-                                checked={entry.status === option}
-                                onChange={(event) => {
-                                  if (event.target.checked) {
-                                    updateEntry(entry.id, 'status', option)
-                                  }
-                                }}
-                                disabled={readOnly}
-                              />
-                              <span>{option}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </label>
-
-                      <label className="entry-field entry-field-wide">
-                        <span className="field-caption">Project</span>
-                        <input
-                          type="text"
-                          placeholder="Project"
-                          value={entry.project}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'project', event.target.value)
-                          }
-                          disabled={readOnly}
-                        />
-                      </label>
-
-                      <label className="entry-field entry-field-wide">
-                        <span className="field-caption">Task description</span>
-                        <input
-                          type="text" 
-                          placeholder="What did you work on?"
-                          value={entry.task}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'task', event.target.value)
-                          }
-                          disabled={readOnly}
-                        />
-                      </label>
-
-                      <label className="entry-field entry-field-full">
-                        <span className="field-caption">Notes</span>
-                        <textarea
-                          rows="3"
-                          placeholder="Notes"
-                          value={entry.notes}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'notes', event.target.value)
-                          }
-                          disabled={readOnly}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="entry-card-footer">
-                      <span className="entry-index">Entry {index + 1}</span>
-                      <button
-                        className="button danger"
-                        type="button"
-                        onClick={() => deleteEntry(entry.id)}
-                        disabled={readOnly}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </article>
-                )
-              })
-            ) : (
-              <div className="empty-state">
-                No entries yet. Add your first time block below.
-              </div>
-            )}
-          </div>
-
-          <div className="table-actions">
-            <button
-              className="button add-entry"
-              type="button"
-              onClick={addEntry}
-              disabled={readOnly}
-            >
-              Add entry
-            </button>
-            <p className="hint">
-              Time uses 24-hour format with 10-minute steps (for example, 13:20).
-              Duration auto-calculates when the end time is later than the start
-              time.
-            </p>
-          </div>
-
-        </section>
+        <DayPanel
+          activeDay={activeDay}
+          days={days}
+          activePanel={activePanel}
+          onSetActivePanel={setActivePanel}
+          onDeleteDay={confirmDeleteDay}
+          onUpdateEntry={updateEntry}
+          onDeleteEntry={deleteEntry}
+          onAddEntry={addEntry}
+          onUpdateDayField={updateDayField}
+          onUpdateTodo={updateTodo}
+          onDeleteTodo={deleteTodo}
+          onAddTodo={addTodo}
+          readOnly={readOnly}
+        />
       </div>
     </div>
   )

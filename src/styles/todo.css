@@ -1,0 +1,22 @@
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.todo-card .todo-task-field {
+  grid-column: span 4;
+}
+
+.todo-card .todo-completed-field {
+  grid-column: span 4;
+}
+
+.todo-card .todo-completed-field .status-group {
+  flex-wrap: nowrap;
+}
+
+.todo-card .todo-priority-field,
+.todo-card .todo-date-field {
+  grid-column: span 2;
+}

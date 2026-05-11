@@ -1,0 +1,12 @@
+.notice {
+  border-radius: 22px;
+  padding: 14px 18px;
+}
+
+.notice.success {
+  color: var(--success);
+}
+
+.notice.error {
+  color: var(--danger);
+}

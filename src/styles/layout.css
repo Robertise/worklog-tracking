@@ -1,0 +1,53 @@
+.app-shell {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  padding: 40px 24px 72px;
+}
+
+.app-glow {
+  position: fixed;
+  border-radius: 999px;
+  filter: blur(30px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-glow-one {
+  top: 80px;
+  right: 6%;
+  width: 280px;
+  height: 280px;
+  background: var(--accent-soft);
+}
+
+.app-glow-two {
+  left: 4%;
+  bottom: 80px;
+  width: 340px;
+  height: 340px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.app {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: fadeUp 0.5s ease both;
+}
+
+.app-header,
+.toolbar-panel,
+.profile-panel,
+.tabs-panel,
+.day-panel,
+.notice {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}

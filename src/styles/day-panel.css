@@ -1,0 +1,42 @@
+.day-panel {
+  border-radius: 32px;
+  padding: 24px 20px 20px;
+}
+
+.day-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 0 8px 12px;
+}
+
+.day-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+
+.panel-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.panel-tab.active {
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  color: #f8fbff;
+}

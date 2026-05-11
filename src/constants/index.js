@@ -1,0 +1,12 @@
+export const STATUS_OPTIONS = ['Not started', 'In progress', 'Done']
+export const TODO_PRIORITIES = ['Low', 'Normal', 'High']
+export const FILE_VERSION = 1
+export const STORAGE_KEY = 'worklog-ledger:v1'
+export const PROFILE_STORAGE_KEY = 'worklog-ledger:profile'
+export const THEME_STORAGE_KEY = 'worklog-ledger:theme'
+export const TIME_STEP_MINUTES = 10
+export const TIME_START_HOUR = 9
+export const TIME_END_HOUR = 17
+export const DEFAULT_CHECKIN = '09:00'
+export const DEFAULT_CHECKOUT = '17:00'
+export const DEFAULT_PROFILE = { fullName: '', studentId: '', email: '' }
