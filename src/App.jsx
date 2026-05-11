@@ -7,6 +7,15 @@ const STATUS_OPTIONS = ['Not started', 'In progress', 'Done']
 const FILE_VERSION = 1
 const STORAGE_KEY = 'worklog-ledger:v1'
 const THEME_STORAGE_KEY = 'worklog-ledger:theme'
+const TIME_STEP_MINUTES = 10
+const TIME_OPTIONS = Array.from({ length: 24 * (60 / TIME_STEP_MINUTES) }, (_, index) => {
+  const totalMinutes = index * TIME_STEP_MINUTES
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+})
+
+
 
 const createId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -199,6 +208,8 @@ function App() {
     )
   }
 
+
+
   const addEntry = () => {
     setDays((prevDays) =>
       prevDays.map((day) =>
@@ -234,6 +245,33 @@ function App() {
       return nextDays
     })
     setActiveDayId(pendingDate)
+  }
+
+  const deleteDay = (dayId) => {
+    if (readOnly) return
+    if (days.length <= 1) {
+      setNotice({ type: 'error', text: 'Keep at least one day in the log.' })
+      return
+    }
+    const nextDays = days.filter((day) => day.id !== dayId)
+    const nextActiveId =
+      dayId === activeDayId ? nextDays[0].id : activeDayId
+    setDays(nextDays)
+    setActiveDayId(nextActiveId)
+    if (pendingDate === dayId) {
+      setPendingDate(nextActiveId)
+    }
+    setNotice({ type: 'success', text: 'Day deleted.' })
+  }
+
+  const confirmDeleteDay = (dayId) => {
+    if (!dayId || readOnly) return
+    const targetLabel = days.find((day) => day.id === dayId)?.label || dayId
+    const confirmed = window.confirm(
+      `Delete ${targetLabel} and all entries for that day?`,
+    )
+    if (!confirmed) return
+    deleteDay(dayId)
   }
 
   const triggerSave = () => {
@@ -454,6 +492,16 @@ function App() {
               <h2>{activeDay?.label || 'No day selected'}</h2>
               <p className="subtle">{activeDay?.entries.length || 0} entries</p>
             </div>
+            <div className="day-actions">
+              <button
+                className="button danger"
+                type="button"
+                onClick={() => confirmDeleteDay(activeDay?.id)}
+                disabled={readOnly || days.length <= 1}
+              >
+                Delete day
+              </button>
+            </div>
           </div>
 
           <div className="entry-list" role="region" aria-live="polite">
@@ -478,28 +526,44 @@ function App() {
                     <div className="entry-grid">
                       <label className="entry-field entry-field-compact">
                         <span className="field-caption">Start time</span>
-                        <input
-                          type="time"
-                          step="300"
-                          value={entry.startTime}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'startTime', event.target.value)
-                          }
-                          disabled={readOnly}
-                        />
+                        <div className="time-picker">
+                          <select
+                            value={entry.startTime}
+                            onChange={(event) =>
+                              updateEntry(entry.id, 'startTime', event.target.value)
+                            }
+                            disabled={readOnly}
+                            aria-label="Start time"
+                          >
+                            <option value="">--:--</option>
+                            {TIME_OPTIONS.map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </label>
 
                       <label className="entry-field entry-field-compact">
                         <span className="field-caption">End time</span>
-                        <input
-                          type="time"
-                          step="300"
-                          value={entry.endTime}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'endTime', event.target.value)
-                          }
-                          disabled={readOnly}
-                        />
+                        <div className="time-picker">
+                          <select
+                            value={entry.endTime}
+                            onChange={(event) =>
+                              updateEntry(entry.id, 'endTime', event.target.value)
+                            }
+                            disabled={readOnly}
+                            aria-label="End time"
+                          >
+                            <option value="">--:--</option>
+                            {TIME_OPTIONS.map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </label>
 
                       <div className="entry-field duration-card">
@@ -515,19 +579,23 @@ function App() {
 
                       <label className="entry-field">
                         <span className="field-caption">Status</span>
-                        <select
-                          value={entry.status}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'status', event.target.value)
-                          }
-                          disabled={readOnly}
-                        >
+                        <div className="status-group" role="group">
                           {STATUS_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
+                            <label key={option} className="status-option">
+                              <input
+                                type="checkbox"
+                                checked={entry.status === option}
+                                onChange={(event) => {
+                                  if (event.target.checked) {
+                                    updateEntry(entry.id, 'status', option)
+                                  }
+                                }}
+                                disabled={readOnly}
+                              />
+                              <span>{option}</span>
+                            </label>
                           ))}
-                        </select>
+                        </div>
                       </label>
 
                       <label className="entry-field entry-field-wide">
@@ -546,7 +614,7 @@ function App() {
                       <label className="entry-field entry-field-wide">
                         <span className="field-caption">Task description</span>
                         <input
-                          type="text"
+                          type="text" 
                           placeholder="What did you work on?"
                           value={entry.task}
                           onChange={(event) =>
@@ -601,10 +669,12 @@ function App() {
               Add entry
             </button>
             <p className="hint">
-              Time uses 24-hour format (for example, 13:00). Duration
-              auto-calculates when the end time is later than the start time.
+              Time uses 24-hour format with 10-minute steps (for example, 13:20).
+              Duration auto-calculates when the end time is later than the start
+              time.
             </p>
           </div>
+
         </section>
       </div>
     </div>

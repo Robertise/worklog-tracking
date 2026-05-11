@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-display: 'Aptos Display', 'Segoe UI Semibold', 'Segoe UI', sans-serif;
   --font-mono: 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
@@ -31,6 +32,7 @@
 }
 
 :root[data-theme='dark'] {
+  color-scheme: dark;
   --bg: #0a1322;
   --bg-accent: #152640;
   --bg-accent-strong: rgba(95, 232, 149, 0.12);
