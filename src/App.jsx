@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import './App.css'
+import { Moon, Sun } from 'lucide-react';
 
 const STATUS_OPTIONS = ['Not started', 'In progress', 'Done']
 const FILE_VERSION = 1
 const STORAGE_KEY = 'worklog-ledger:v1'
+const THEME_STORAGE_KEY = 'worklog-ledger:theme'
 
 const createId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -119,6 +121,17 @@ const loadFromStorage = () => {
   }
 }
 
+const getPreferredTheme = () => {
+  if (typeof window === 'undefined') return 'light'
+  const savedTheme = window.localStorage?.getItem(THEME_STORAGE_KEY)
+  if (savedTheme === 'light' || savedTheme === 'dark') {
+    return savedTheme
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
+}
+
 function App() {
   const initialDate = todayStamp()
   const initialData = useMemo(() => loadFromStorage(), [])
@@ -133,6 +146,7 @@ function App() {
   const [pendingDate, setPendingDate] = useState(
     () => initialData?.pendingDate || initialDate,
   )
+  const [theme, setTheme] = useState(getPreferredTheme)
   const [readOnly, setReadOnly] = useState(false)
   const [notice, setNotice] = useState(null)
   const fileInputRef = useRef(null)
@@ -161,6 +175,15 @@ function App() {
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
   }, [days, activeDayId, pendingDate])
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.theme = theme
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+    }
+  }, [theme])
 
   const updateEntry = (entryId, field, value) => {
     setDays((prevDays) =>
@@ -295,80 +318,74 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">Worklog Studio</p>
-          <h1>Daily Worklog Ledger</h1>
-          <p className="subtle">
-            Track your day in timed blocks. Auto-saves to this browser and
-            exports Excel-ready sheets when needed.
-          </p>
-        </div>
-        <div className="header-actions">
-          <button className="button primary" type="button" onClick={triggerSave}>
-            Save file
-          </button>
-          <button className="button outline" type="button" onClick={triggerImport}>
-            Import file
-          </button>
-          <button
-            className="button ghost"
-            type="button"
-            onClick={() => exportWorkbook('active')}
-          >
-            Export day
-          </button>
-          <button
-            className="button ghost"
-            type="button"
-            onClick={() => exportWorkbook('all')}
-          >
-            Export all
-          </button>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={readOnly}
-              onChange={(event) => setReadOnly(event.target.checked)}
-            />
-            <span>View-only</span>
-          </label>
-          <input
-            ref={fileInputRef}
-            className="file-input"
-            type="file"
-            accept="application/json"
-            onChange={handleImport}
-          />
-        </div>
-      </header>
+    <div className="app-shell">
+      <div className="app-glow app-glow-one" aria-hidden="true" />
+      <div className="app-glow app-glow-two" aria-hidden="true" />
 
-      {notice && (
-        <div className={`notice ${notice.type}`} role="status">
-          {notice.text}
-        </div>
-      )}
-
-      <section className="tabs-panel">
-        <div className="tab-row">
-          <div className="tab-list" role="tablist" aria-label="Worklog days">
-            {days.map((day) => (
-              <button
-                key={day.id}
-                className={`tab ${day.id === activeDayId ? 'active' : ''}`}
-                type="button"
-                role="tab"
-                aria-selected={day.id === activeDayId}
-                onClick={() => setActiveDayId(day.id)}
-              >
-                {day.label}
-              </button>
-            ))}
+      <div className="app">
+        <header className="app-header">
+          <div className="hero-copy">
+            <p className="eyebrow">Worklog Studio</p>
+            <h1>Daily Worklog Ledger</h1>
+            <p className="subtle">
+              Track your day in timed blocks. Auto-saves to this browser and
+              exports Excel-ready sheets when needed.
+            </p>
           </div>
-          <div className="tab-actions">
-            <label>
-              <span className="field-label">Add day</span>
+
+          <aside className="summary-card" aria-label="Total hours summary">
+            <span>Total Hours</span>
+            <strong>{totalHours.toFixed(2)}</strong>
+            <small>{activeDay?.entries.length || 0} entries today</small>
+          </aside>
+        </header>
+
+        <section className="toolbar-panel">
+          <div className="header-actions">
+            <button className="button primary" type="button" onClick={triggerSave}>
+              Save file
+            </button>
+            <button
+              className="button primary"
+              type="button"
+              onClick={triggerImport}
+            >
+              Import file
+            </button>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => exportWorkbook('active')}
+            >
+              Export day
+            </button>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => exportWorkbook('all')}
+            >
+              Export all
+            </button>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={readOnly}
+                onChange={(event) => setReadOnly(event.target.checked)}
+              />
+              <span>View-only</span>
+            </label>
+            <input
+              ref={fileInputRef}
+              className="file-input"
+              type="file"
+              accept="application/json"
+              onChange={handleImport}
+            />
+          </div>
+
+          <div className="toolbar-side">
+            <label className="date-control">
+              <span className="field-label">Worklog date</span>
               <input
                 type="date"
                 value={pendingDate}
@@ -376,64 +393,91 @@ function App() {
                 disabled={readOnly}
               />
             </label>
-            <button
-              className="button outline"
-              type="button"
-              onClick={addDay}
-              disabled={readOnly || !pendingDate}
-            >
-              Add
-            </button>
-          </div>
-        </div>
-      </section>
 
-      <section className="day-panel">
-        <div className="day-meta">
-          <div>
-            <h2>{activeDay?.label || 'No day selected'}</h2>
-            <p className="subtle">{activeDay?.entries.length || 0} entries</p>
+            <div className="theme-switcher" role="group" aria-label="Theme">
+              <button
+                className={`theme-option ${theme === 'light' ? 'active' : ''}`}
+                type="button"
+                onClick={() => setTheme('light')}
+              >
+                <Sun size={16} /> 
+              </button>
+              <button
+                className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
+                type="button"
+                onClick={() => setTheme('dark')}
+              >
+                <Moon size={16} />
+              </button>
+            </div>
           </div>
-          <div className="totals">
-            <span>Total hours</span>
-            <strong>{totalHours.toFixed(2)}</strong>
-          </div>
-        </div>
+        </section>
 
-        <div className="table-shell" role="region" aria-live="polite">
-          <table className="worklog-table">
-            <thead>
-              <tr>
-                <th>Start time</th>
-                <th>End time</th>
-                <th>Project</th>
-                <th>Task description</th>
-                <th>Duration (hrs)</th>
-                <th>Status</th>
-                <th>Notes</th>
-                <th aria-label="Row actions"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeDay?.entries.length ? (
-                activeDay.entries.map((entry, index) => {
-                  const duration = calculateDurationHours(
-                    entry.startTime,
-                    entry.endTime,
-                  )
-                  const durationLabel =
-                    duration === null ? '--' : duration.toFixed(2)
-                  const invalidRange =
-                    entry.startTime &&
-                    entry.endTime &&
-                    duration === null
-                  return (
-                    <tr
-                      key={entry.id}
-                      className={`entry-row ${invalidRange ? 'invalid' : ''}`}
-                      style={{ '--i': index }}
-                    >
-                      <td>
+        {notice && (
+          <div className={`notice ${notice.type}`} role="status">
+            {notice.text}
+          </div>
+        )}
+
+        <section className="tabs-panel">
+          <div className="tab-row">
+            <div className="tab-list" role="tablist" aria-label="Worklog days">
+              {days.map((day) => (
+                <button
+                  key={day.id}
+                  className={`tab ${day.id === activeDayId ? 'active' : ''}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={day.id === activeDayId}
+                  onClick={() => setActiveDayId(day.id)}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
+            <div className="tab-actions">
+              <button
+                className="button outline"
+                type="button"
+                onClick={addDay}
+                disabled={readOnly || !pendingDate}
+              >
+                Add day
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="day-panel">
+          <div className="day-meta">
+            <div>
+              <h2>{activeDay?.label || 'No day selected'}</h2>
+              <p className="subtle">{activeDay?.entries.length || 0} entries</p>
+            </div>
+          </div>
+
+          <div className="entry-list" role="region" aria-live="polite">
+            {activeDay?.entries.length ? (
+              activeDay.entries.map((entry, index) => {
+                const duration = calculateDurationHours(
+                  entry.startTime,
+                  entry.endTime,
+                )
+                const durationLabel =
+                  duration === null ? '--' : duration.toFixed(2)
+                const invalidRange =
+                  entry.startTime &&
+                  entry.endTime &&
+                  duration === null
+                return (
+                  <article
+                    key={entry.id}
+                    className={`entry-card ${invalidRange ? 'invalid' : ''}`}
+                    style={{ '--i': index }}
+                  >
+                    <div className="entry-grid">
+                      <label className="entry-field entry-field-compact">
+                        <span className="field-caption">Start time</span>
                         <input
                           type="time"
                           step="300"
@@ -443,8 +487,10 @@ function App() {
                           }
                           disabled={readOnly}
                         />
-                      </td>
-                      <td>
+                      </label>
+
+                      <label className="entry-field entry-field-compact">
+                        <span className="field-caption">End time</span>
                         <input
                           type="time"
                           step="300"
@@ -454,38 +500,21 @@ function App() {
                           }
                           disabled={readOnly}
                         />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          placeholder="Project"
-                          value={entry.project}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'project', event.target.value)
-                          }
-                          disabled={readOnly}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          placeholder="What did you work on?"
-                          value={entry.task}
-                          onChange={(event) =>
-                            updateEntry(entry.id, 'task', event.target.value)
-                          }
-                          disabled={readOnly}
-                        />
-                      </td>
-                      <td>
+                      </label>
+
+                      <div className="entry-field duration-card">
+                        <span className="field-caption">Duration</span>
                         <div className="duration">
-                          <span>{durationLabel}</span>
+                          <strong>{durationLabel}</strong>
+                          <span>hours</span>
                           {invalidRange && (
-                            <small>End must be after start</small>
+                            <small>End time must be after start time.</small>
                           )}
                         </div>
-                      </td>
-                      <td>
+                      </div>
+
+                      <label className="entry-field">
+                        <span className="field-caption">Status</span>
                         <select
                           value={entry.status}
                           onChange={(event) =>
@@ -499,10 +528,38 @@ function App() {
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td>
+                      </label>
+
+                      <label className="entry-field entry-field-wide">
+                        <span className="field-caption">Project</span>
+                        <input
+                          type="text"
+                          placeholder="Project"
+                          value={entry.project}
+                          onChange={(event) =>
+                            updateEntry(entry.id, 'project', event.target.value)
+                          }
+                          disabled={readOnly}
+                        />
+                      </label>
+
+                      <label className="entry-field entry-field-wide">
+                        <span className="field-caption">Task description</span>
+                        <input
+                          type="text"
+                          placeholder="What did you work on?"
+                          value={entry.task}
+                          onChange={(event) =>
+                            updateEntry(entry.id, 'task', event.target.value)
+                          }
+                          disabled={readOnly}
+                        />
+                      </label>
+
+                      <label className="entry-field entry-field-full">
+                        <span className="field-caption">Notes</span>
                         <textarea
-                          rows="2"
+                          rows="3"
                           placeholder="Notes"
                           value={entry.notes}
                           onChange={(event) =>
@@ -510,45 +567,46 @@ function App() {
                           }
                           disabled={readOnly}
                         />
-                      </td>
-                      <td className="row-actions">
-                        <button
-                          className="button danger"
-                          type="button"
-                          onClick={() => deleteEntry(entry.id)}
-                          disabled={readOnly}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan="8" className="empty-state">
-                    No entries yet. Add your first time block below.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </label>
+                    </div>
 
-        <div className="table-actions">
-          <button
-            className="button primary"
-            type="button"
-            onClick={addEntry}
-            disabled={readOnly}
-          >
-            Add entry
-          </button>
-          <p className="hint">
-            Time is in 24-hour format (e.g., 13:00). Duration auto-calculates.
-          </p>
-        </div>
-      </section>
+                    <div className="entry-card-footer">
+                      <span className="entry-index">Entry {index + 1}</span>
+                      <button
+                        className="button danger"
+                        type="button"
+                        onClick={() => deleteEntry(entry.id)}
+                        disabled={readOnly}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </article>
+                )
+              })
+            ) : (
+              <div className="empty-state">
+                No entries yet. Add your first time block below.
+              </div>
+            )}
+          </div>
+
+          <div className="table-actions">
+            <button
+              className="button add-entry"
+              type="button"
+              onClick={addEntry}
+              disabled={readOnly}
+            >
+              Add entry
+            </button>
+            <p className="hint">
+              Time uses 24-hour format (for example, 13:00). Duration
+              auto-calculates when the end time is later than the start time.
+            </p>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
