@@ -8,12 +8,17 @@ const FILE_VERSION = 1
 const STORAGE_KEY = 'worklog-ledger:v1'
 const THEME_STORAGE_KEY = 'worklog-ledger:theme'
 const TIME_STEP_MINUTES = 10
-const TIME_OPTIONS = Array.from({ length: 24 * (60 / TIME_STEP_MINUTES) }, (_, index) => {
-  const totalMinutes = index * TIME_STEP_MINUTES
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
-})
+const TIME_START_HOUR = 9
+const TIME_END_HOUR = 17
+const TIME_OPTIONS = Array.from(
+  { length: (TIME_END_HOUR - TIME_START_HOUR) * (60 / TIME_STEP_MINUTES) + 1 },
+  (_, index) => {
+    const totalMinutes = TIME_START_HOUR * 60 + index * TIME_STEP_MINUTES
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  },
+)
 
 
 
