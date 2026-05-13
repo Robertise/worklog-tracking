@@ -24,14 +24,22 @@ import Notice from './components/Notice'
 function App() {
   const initialDate = todayStamp()
   const initialData = useMemo(() => loadFromStorage(), [])
-  const [days, setDays] = useState(() =>
-    initialData?.days || [createDay(initialDate, true)],
-  )
+  
+  // Reset to current day if stored data is from a previous day
+  const shouldResetToToday = initialData && initialData.activeDayId !== initialDate
+  
+  const [days, setDays] = useState(() => {
+    if (shouldResetToToday) {
+      // Start fresh with today's worklog
+      return [createDay(initialDate, true)]
+    }
+    return initialData?.days || [createDay(initialDate, true)]
+  })
   const [activeDayId, setActiveDayId] = useState(
-    () => initialData?.activeDayId || initialDate,
+    () => shouldResetToToday ? initialDate : (initialData?.activeDayId || initialDate),
   )
   const [pendingDate, setPendingDate] = useState(
-    () => initialData?.pendingDate || initialDate,
+    () => shouldResetToToday ? initialDate : (initialData?.pendingDate || initialDate),
   )
   const [profile, setProfile] = useState(() => loadProfileFromStorage())
   const [theme, setTheme] = useState(getPreferredTheme)
